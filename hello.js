@@ -82,3 +82,58 @@ app.post("/register", upload.single("idFile"), (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+
+// Registration Route (Stores in MongoDB)
+// app.post("/register", upload.single("idFile"), async (req, res) => {
+//   try {
+//     if (err instanceof multer.MulterError) {
+//       // File too large error
+//       if (err.code === "LIMIT_FILE_SIZE") {
+//         return res.status(400).json({ error: "File size must be less than 5MB!" });
+//       }
+//     } else if (err) {
+//       // File format error
+//       return res.status(400).json({ error: err.message });
+//     }
+//     const { firstName, lastName, email, gender, phone, country, state, city, address, idType } = req.body;
+
+//     if (!firstName || !lastName || !email || !gender || !phone || !country || !state || !city || !address || !idType || !req.file) {
+//       return res.status(400).json({ error: "All fields and file upload are required!" });
+//     }
+//     // const idFile = req.file ? req.file.path : null;
+
+//     // if (!idFile) {
+//     //   return res.status(400).json({ msg: 'ID file is required' });
+//     // }
+
+//     let userExists = await User.findOne({ email });
+//     if (userExists) {
+//       return res.status(400).json({ msg: 'User already registered' });
+//     }
+
+//     // Save user to MongoDB
+//     const newUser = new User({
+//       firstName,
+//       lastName,
+//       email,
+//       gender,
+//       phone,
+//       country,
+//       state,
+//       city,
+//       address,
+//       idType,
+//       idFileUrl: `/uploads/${req.file.filename}`,
+//     });
+
+//     await newUser.save();
+
+//     res.json({
+//       message: "Registration successful!",
+//       data: newUser,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ error: "Internal Server Error", details: error.message });
+//   }
+// });

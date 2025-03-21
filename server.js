@@ -4,6 +4,7 @@ const multer = require("multer");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
+const sendMail = require("./config/mailer");
 
 const app = express();
 app.use(cors());
@@ -19,7 +20,7 @@ mongoose
 const UserSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
-  email: String,
+  email: { type: String, unique: true, required: true },
   gender: String,
   phone: String,
   country: String,
@@ -28,6 +29,7 @@ const UserSchema = new mongoose.Schema({
   address: String,
   idType: String,
   idFileUrl: String, // Stores file path as a string
+  status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
 }, { timestamps: true });
 
 const User = mongoose.model("User", UserSchema);
@@ -94,68 +96,61 @@ app.post("/register", (req, res, next) => {
 
     await newUser.save();
 
-    res.json({
-      message: "Registration successful!",
+     // Send email to user (confirmation of registration)
+     const userEmailContent = `
+     <h3>Dear ${newUser.firstName},</h3>
+     <p>Your registration has been received! We will review your details and notify you of the approval status.</p>
+   `;
+   await sendMail(newUser.email, "Training Registration Received", userEmailContent);
+
+   // Send email to admin (new registration notification)
+   const adminEmailContent = `
+     <h3>New User Registration</h3>
+     <p>A new user has registered:</p>
+     <ul>
+       <li>Name: ${newUser.firstName} ${newUser.lastName}</li>
+       <li>Email: ${newUser.email}</li>
+       <li>Phone: ${newUser.phone}</li>
+     </ul>
+     <p><a href="https://kings-backend-4diu.onrender.com/users">Review & Approve Users</a></p>
+   `;
+   await sendMail(process.env.ADMIN_EMAIL, "New User Registration", adminEmailContent);
+
+
+    res.status(201).json({
+      message: "Registration successful. Await approval.",
       data: newUser,
     });
+
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });
 
-// Registration Route (Stores in MongoDB)
-// app.post("/register", upload.single("idFile"), async (req, res) => {
-//   try {
-//     if (err instanceof multer.MulterError) {
-//       // File too large error
-//       if (err.code === "LIMIT_FILE_SIZE") {
-//         return res.status(400).json({ error: "File size must be less than 5MB!" });
-//       }
-//     } else if (err) {
-//       // File format error
-//       return res.status(400).json({ error: err.message });
-//     }
-//     const { firstName, lastName, email, gender, phone, country, state, city, address, idType } = req.body;
+// Update User Status
+app.post("/users/update-status", async (req, res) => {
+  try {
+    const { userId, status } = req.body;
+    const user = await User.findById(userId);
 
-//     if (!firstName || !lastName || !email || !gender || !phone || !country || !state || !city || !address || !idType || !req.file) {
-//       return res.status(400).json({ error: "All fields and file upload are required!" });
-//     }
-//     // const idFile = req.file ? req.file.path : null;
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-//     // if (!idFile) {
-//     //   return res.status(400).json({ msg: 'ID file is required' });
-//     // }
+    user.status = status;
+    await user.save();
 
-//     let userExists = await User.findOne({ email });
-//     if (userExists) {
-//       return res.status(400).json({ msg: 'User already registered' });
-//     }
+    // Send approval/rejection email to user
+    const emailContent =
+      status === "approved"
+        ? `<h3>Congratulations ${user.firstName},</h3><p>Your registration has been approved! Further details will be sent soon.</p>`
+        : `<h3>Dear ${user.firstName},</h3><p>Unfortunately, your registration was not approved.</p>`;
 
-//     // Save user to MongoDB
-//     const newUser = new User({
-//       firstName,
-//       lastName,
-//       email,
-//       gender,
-//       phone,
-//       country,
-//       state,
-//       city,
-//       address,
-//       idType,
-//       idFileUrl: `/uploads/${req.file.filename}`,
-//     });
+    await sendMail(user.email, `Your Registration has been ${status}`, emailContent);
 
-//     await newUser.save();
-
-//     res.json({
-//       message: "Registration successful!",
-//       data: newUser,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ error: "Internal Server Error", details: error.message });
-//   }
-// });
+    res.json({ message: `User status updated to ${status}` });
+  } catch (error) {
+    res.status(500).json({ error: "Error updating user status" });
+  }
+});
 
 // Get All Registered Users
 app.get("/users", async (req, res) => {
