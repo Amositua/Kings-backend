@@ -6,10 +6,67 @@ const cors = require("cors");
 const path = require("path");
 const sendMail = require("./config/mailer");
 
+const nodemailer = require("nodemailer");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Email sending function
+const sendEmail = async (formData) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail", // Use your email provider
+    auth: {
+      user: process.env.EMAIL_USER, // Your email
+      pass: process.env.EMAIL_PASS, // Your email password or App Password
+    },
+  });
+
+  const { name, email, message } = formData;
+
+  // Email to Receiver (Your Email)
+  const mailToReceiver = {
+    from: email,
+    to: process.env.RECEIVER_EMAIL, // Your email
+    subject: "New Contact Form Submission",
+    text: `You have received a new message from:
+    
+    Name: ${name}
+    Email: ${email}
+    Message: ${message}`,
+  };
+
+  // Acknowledgment Email to Sender
+  const mailToSender = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Your Submission Was Received!",
+    text: `Hello ${name},
+
+    Thank you for contacting us. We have received your message and will get back to you soon.
+
+    Best regards,
+    Kings Health Care Practitioner Limited`,
+  };
+
+  // Sending Emails
+  await transporter.sendMail(mailToReceiver);
+  await transporter.sendMail(mailToSender);
+};
+
+// API Route to Handle Form Submission
+app.post("/send-email", async (req, res) => {
+  try {
+    await sendEmail(req.body);
+    res.status(200).json({ success: true, message: "Emails sent successfully!" });
+  } catch (error) {
+    console.error("Error sending email:", error);
+    res.status(500).json({ success: false, message: "Failed to send email" });
+  }
+});
+
+
+// PART 2
 // MongoDB Connection
 mongoose
   .connect(process.env.MONGO_URI)
