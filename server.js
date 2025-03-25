@@ -12,6 +12,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.send('API is running....');
+});
+
+app.get('/api/config/paypal', (req, res) => {
+   res.send({clientId: process.env.PAYPAL_CLIENT_ID}) 
+})
 // Email sending function
 const sendEmail = async (formData) => {
   const transporter = nodemailer.createTransport({
@@ -27,7 +34,7 @@ const sendEmail = async (formData) => {
   // Email to Receiver (Your Email)
   const mailToReceiver = {
     from: email,
-    to: process.env.RECEIVER_EMAIL, // Your email
+    to: [process.env.RECEIVER_EMAIL_1, process.env.RECEIVER_EMAIL_2], // Your email
     subject: "New Contact Form Submission",
     text: `You have received a new message from:
     
@@ -93,8 +100,12 @@ const User = mongoose.model("User", UserSchema);
 
 // Multer Storage Configuration
 const storage = multer.diskStorage({
-  destination: "uploads/",
+  destination: (req, file, cb) => {
+    console.log("Saving file to: uploads/"); // Debugging log
+    cb(null, "uploads/");
+  },
   filename: (req, file, cb) => {
+    console.log("File received:", file.originalname); // Debugging log
     cb(null, `idFile-${Date.now()}${path.extname(file.originalname)}`);
   },
 });
@@ -112,7 +123,79 @@ const upload = multer({
 // Serve uploaded files
 app.use("/uploads", express.static("uploads"));
 
+// app.post("/register", upload.single("idFile"), async (req, res) => {
+//   console.log('File:', req.file); // Log file details
+//   console.log('Body:', req.body); // Log form data
+
+//   if (!req.file) {
+//     console.error('No file uploaded');
+//     return res.status(400).json({ error: "No file uploaded" });
+//   }
+  
+//   try {
+//     const { firstName, lastName, email, gender, phone, country, state, city, address, idType } = req.body;
+
+//     if (!firstName || !lastName || !email || !gender || !phone || !country || !state || !city || !address || !idType || !req.file) {
+//       return res.status(400).json({ error: "All fields and file upload are required!" });
+//     }
+
+//     let userExists = await User.findOne({ email });
+//     if (userExists) {
+//       return res.status(400).json({ error: "User already registered" });
+//     }
+
+//     // Save user to MongoDB
+//     const newUser = new User({
+//       firstName,
+//       lastName,
+//       email,
+//       gender,
+//       phone,
+//       country,
+//       state,
+//       city,
+//       address,
+//       idType,
+//       idFileUrl: `/uploads/${req.file.filename}`,
+//     });
+
+//     await newUser.save();
+
+//      // Send email to user (confirmation of registration)
+//      const userEmailContent = `
+//      <h3>Dear ${newUser.firstName},</h3>
+//      <p>Your registration has been received! We will review your details and notify you of the approval status.</p>
+//    `;
+//    await sendMail(newUser.email, "Training Registration Received", userEmailContent);
+
+//    // Send email to admin (new registration notification)
+//    const adminEmailContent = `
+//      <h3>New User Registration</h3>
+//      <p>A new user has registered:</p>
+//      <ul>
+//        <li>Name: ${newUser.firstName} ${newUser.lastName}</li>
+//        <li>Email: ${newUser.email}</li>
+//        <li>Phone: ${newUser.phone}</li>
+//      </ul>
+//      <p><a href="https://kings-backend-4diu.onrender.com/users">Review & Approve Users</a></p>
+//    `;
+//    await sendMail(process.env.ADMIN_EMAIL, "New User Registration", adminEmailContent);
+
+
+//     res.status(201).json({
+//       message: "Registration successful. Await approval.",
+//       data: newUser,
+//     });
+
+//   } catch (error) {
+//     res.status(500).json({ error: "Internal Server Error", details: error.message });
+//   }
+// });
+
+
 app.post("/register", (req, res, next) => {
+  console.log('File:', req.file); // Log file details
+  console.log('Body:', req.body);
   upload.single("idFile")(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       // Handle Multer-specific errors (e.g., file too large, invalid format)
