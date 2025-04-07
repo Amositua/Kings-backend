@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const Stripe = require("stripe");
 const multer = require("multer");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -8,9 +9,40 @@ const sendMail = require("./config/mailer");
 
 const nodemailer = require("nodemailer");
 
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com blob:https://js.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com;"
+  );
+  next();
+});
+// route to create a payment intent
+app.post("/create-payment-intent", async (req, res) => {
+  try {
+    const { amount, currency } = req.body;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100, // Convert to smallest currency unit
+      currency: currency || "usd",
+      payment_method_types: ["card"],
+    });
+
+    res.status(200).json({
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 app.get('/', (req, res) => {
   res.send('API is running....');
