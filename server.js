@@ -1,6 +1,6 @@
 require("dotenv").config();
 const express = require("express");
-// const Stripe = require("stripe");
+const Stripe = require("stripe");
 const multer = require("multer");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -10,7 +10,7 @@ const sendMail = require("./config/mailer");
 const nodemailer = require("nodemailer");
 
 
-// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 
 const app = express();
@@ -24,33 +24,44 @@ app.use(express.json());
 //   );
 //   next();
 // });
-// // route to create a payment intent
-// app.post("/create-payment-intent", async (req, res) => {
-//   try {
-//     const { amount, currency } = req.body;
 
-//     const paymentIntent = await stripe.paymentIntents.create({
-//       amount: amount * 100, // Convert to smallest currency unit
-//       currency: currency || "usd",
-//       payment_method_types: ["card"],
-//     });
 
-//     res.status(200).json({
-//       clientSecret: paymentIntent.client_secret,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
+// route to create a payment intent
+app.post("/create-checkout-session", async (req, res) => {
+  try {
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency: 'ngn',
+            product_data: { name: 'Service Payment' },
+            unit_amount: 70000, // $50.00 in cents
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: 'http://localhost:3000/success',
+      cancel_url: 'http://localhost:3000/cancel',
+    });
+    
+    res.json({ id: session.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 
 app.get('/', (req, res) => {
   res.send('API is running....');
-});
+}); 
 
 app.get('/api/config/paypal', (req, res) => {
    res.send({clientId: process.env.PAYPAL_CLIENT_ID}) 
 })
+
 // Email sending function
 const sendEmail = async (formData) => {
   const transporter = nodemailer.createTransport({
